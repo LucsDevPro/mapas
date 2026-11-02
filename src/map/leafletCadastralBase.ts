@@ -50,6 +50,28 @@ interface ParsedTile {
   fetchedAt: number;
 }
 
+/**
+ * Executa uma requisição com tempo-limite. Sem isso, uma requisição que trava
+ * (rede lenta, bloqueio, servidor fora) deixa o mapa em branco para sempre,
+ * porque a camada de contingência só entra quando a busca termina.
+ */
+async function withTimeout<T>(
+  run: (signal: AbortSignal) => Promise<T>,
+  outer: AbortSignal | undefined,
+  ms: number
+): Promise<T> {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), ms);
+  const onAbort = () => ctrl.abort();
+  outer?.addEventListener('abort', onAbort);
+  try {
+    return await run(ctrl.signal);
+  } finally {
+    window.clearTimeout(timer);
+    outer?.removeEventListener('abort', onAbort);
+  }
+}
+
 function tilePointToLatLng(
   z: number,
   x: number,
@@ -175,8 +197,11 @@ export class CadastralBaseLayer {
     if (!this.templatePromise) {
       this.templatePromise = (async () => {
         try {
-          const res = await fetch(TILEJSON_URL);
-          const json = await res.json();
+          const json = await withTimeout(
+            async (signal) => (await fetch(TILEJSON_URL, { signal })).json(),
+            undefined,
+            6000
+          );
           const tiles: string[] = json?.tiles || [];
           const template = tiles.find((t) => t.includes('{z}'));
           if (template) return template;
@@ -205,9 +230,16 @@ export class CadastralBaseLayer {
       .replace('{x}', String(x))
       .replace('{y}', String(y));
     try {
-      const res = await fetch(url, { signal });
-      if (!res.ok) return null;
-      const buffer = await res.arrayBuffer();
+      const buffer = await withTimeout(
+        async (s) => {
+          const res = await fetch(url, { signal: s });
+          if (!res.ok) return null;
+          return res.arrayBuffer();
+        },
+        signal,
+        10000
+      );
+      if (!buffer) return null;
       if (buffer.byteLength === 0) {
         const empty: ParsedTile = { streets: [], labels: [], fetchedAt: Date.now() };
         this.cache.set(key, empty);
