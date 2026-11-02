@@ -1,6 +1,7 @@
 import * as L from 'leaflet';
 import { jsPDF } from 'jspdf';
 import { toCanvas } from 'html-to-image';
+import logoPrefeitura from '../assets/logo-prefeitura.png';
 import {
   CadastralFeature,
   LatLngTuple,
@@ -227,6 +228,21 @@ export function getMapFrameViewportCrop(
   return { cropX, cropY, cropW, cropH, mapAspect };
 }
 
+let logoPromise: Promise<HTMLImageElement | null> | null = null;
+
+/** Carrega (uma única vez) o logotipo da Prefeitura para desenhar no cabeçalho da prancha */
+function loadLogoImage(): Promise<HTMLImageElement | null> {
+  if (!logoPromise) {
+    logoPromise = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = logoPrefeitura;
+    });
+  }
+  return logoPromise;
+}
+
 /**
  * Compõe a Prancha Cadastral completa em alta resolução (A4 ou A3, Retrato ou Paisagem)
  */
@@ -297,20 +313,26 @@ export async function renderCadastralSheetCanvas(
   const mainTitleText =
     cfg.title?.trim() || `BAIRRO ${project.neighborhoodName.toUpperCase()}`;
 
+  // Logotipo da Prefeitura à esquerda do cabeçalho; os textos começam depois dele
+  let textX = frameX + 4 * pxPerMm;
+  const logo = await loadLogoImage();
+  if (logo && logo.naturalHeight > 0) {
+    const logoH = headerH - 4 * pxPerMm;
+    const logoW = logoH * (logo.naturalWidth / logo.naturalHeight);
+    ctx.drawImage(logo, frameX + 2 * pxPerMm, frameY + 2 * pxPerMm, logoW, logoH);
+    textX = frameX + 2 * pxPerMm + logoW + 4 * pxPerMm;
+  }
+  const titleMaxW = Math.max(20 * pxPerMm, frameX + titleAreaW - textX - 4 * pxPerMm);
+
   ctx.fillStyle = '#475569';
   ctx.font = `700 ${Math.round(3.1 * pxPerMm)}px Inter, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(subtitleText, frameX + 4 * pxPerMm, frameY + 2.8 * pxPerMm);
+  ctx.fillText(subtitleText, textX, frameY + 2.8 * pxPerMm, titleMaxW);
 
   ctx.fillStyle = '#0f172a';
   ctx.font = `800 ${Math.round(6.2 * pxPerMm)}px Inter, sans-serif`;
-  ctx.fillText(
-    mainTitleText,
-    frameX + 4 * pxPerMm,
-    frameY + 7.4 * pxPerMm,
-    titleAreaW - 8 * pxPerMm
-  );
+  ctx.fillText(mainTitleText, textX, frameY + 7.4 * pxPerMm, titleMaxW);
 
   // Metadados técnicos à direita do cabeçalho
   const center = leafletMap.getCenter();
