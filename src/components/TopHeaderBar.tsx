@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import logoPrefeitura from '../assets/logo-prefeitura.png';
 import {
-  Map as MapIcon,
   FolderKanban,
   Save,
   CheckCircle2,
@@ -114,18 +114,32 @@ export const TopHeaderBar: React.FC<TopHeaderBarProps> = ({
   const quarteiraoCount = project.features.filter((f) => f.kind === 'quarteirao').length;
 
   return (
-    <header className="h-13 bg-slate-900 text-white border-b border-slate-800 px-3 flex items-center justify-between gap-2 z-[700] shrink-0 no-print">
+    <header className="relative h-14 bg-slate-900 text-white px-3 pb-[3px] flex items-center justify-between gap-2 z-[700] shrink-0 no-print">
+      {/* Faixa institucional com as cores do logotipo da Prefeitura */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 h-[3px]"
+        style={{
+          background:
+            'linear-gradient(90deg, #0677c5 0 35%, #11a7c0 35% 55%, #00b830 55% 75%, #f8b800 75% 92%, #b81030 92% 100%)',
+        }}
+      />
+
       {/* Identidade do Sistema + Nome do Bairro/Projeto Ativo */}
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 shrink-0">
-          <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center shadow-inner">
-            <MapIcon className="w-3.5 h-3.5 text-white" />
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="bg-white rounded-md px-2 py-1 shadow-sm">
+            <img
+              src={logoPrefeitura}
+              alt="Prefeitura Municipal de Ponta Porã"
+              className="h-8 w-auto block"
+            />
           </div>
-          <div className="leading-tight hidden md:block">
+          <div className="leading-tight hidden lg:block">
             <div className="text-[11px] font-extrabold tracking-wider text-white">
               SIG URBANO
             </div>
-            <div className="text-[9.5px] font-medium text-blue-300 tracking-tight">
+            <div className="text-[9.5px] font-medium text-cyan-300 tracking-tight">
               PONTA PORÃ – MS
             </div>
           </div>
@@ -330,7 +344,7 @@ export const TopHeaderBar: React.FC<TopHeaderBarProps> = ({
         <button
           type="button"
           onClick={onOpenPrintModal}
-          className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
+          className="bg-brand-gold hover:brightness-110 text-slate-900 text-xs font-bold px-3 py-1.5 rounded-md shadow-sm flex items-center gap-1.5 transition"
         >
           <Printer className="w-3.5 h-3.5" />
           <span>Imprimir / Exportar</span>

@@ -2,6 +2,36 @@
 @import "leaflet/dist/leaflet.css";
 @import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 
+/*
+ * Identidade visual da Prefeitura Municipal de Ponta Porã.
+ * Cores extraídas do logotipo: azul-marinho, azul, ciano, verde, dourado e vermelho.
+ * Redefinir blue-* e slate-800/900/950 recolore todo o app de uma só vez.
+ */
+@theme {
+  --color-brand-navy: #001d5a;
+  --color-brand-blue: #0677c5;
+  --color-brand-cyan: #11a7c0;
+  --color-brand-green: #00b830;
+  --color-brand-gold: #f8b800;
+  --color-brand-red: #b81030;
+
+  --color-blue-50: #eef7fd;
+  --color-blue-100: #d9edfa;
+  --color-blue-200: #b6dbf4;
+  --color-blue-300: #84c3ec;
+  --color-blue-400: #4aa5de;
+  --color-blue-500: #1c8bd1;
+  --color-blue-600: #0677c5;
+  --color-blue-700: #095ea0;
+  --color-blue-800: #08438c;
+  --color-blue-900: #062f66;
+  --color-blue-950: #001d5a;
+
+  --color-slate-800: #0b2e72;
+  --color-slate-900: #001d5a;
+  --color-slate-950: #00143f;
+}
+
 @layer base {
   html,
   body,
@@ -66,7 +96,7 @@
 }
 
 .cadastral-label-selected .cadastral-label-inner {
-  outline: 2px dashed #2563eb;
+  outline: 2px dashed #0677c5;
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -74,7 +104,7 @@
 /* Clean Geoman vertex markers for precision cadastral editing */
 .marker-icon {
   background-color: #ffffff !important;
-  border: 2px solid #1d4ed8 !important;
+  border: 2px solid #08438c !important;
   border-radius: 50% !important;
   width: 11px !important;
   height: 11px !important;

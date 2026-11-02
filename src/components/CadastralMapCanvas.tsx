@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as L from 'leaflet';
 import '@geoman-io/leaflet-geoman-free';
-import { Plus, Minus, Maximize2, Compass, Crosshair } from 'lucide-react';
+import { Plus, Minus, Maximize2, Compass, Crosshair, Printer, X } from 'lucide-react';
 import {
   CadastralFeature,
   CartographyConfig,
@@ -42,6 +42,10 @@ interface CadastralMapCanvasProps {
   onViewportChange: (center: LatLngTuple, zoom: number) => void;
   onVisibleStreetsChange: (streets: string[]) => void;
   onRequestToolChange?: (tool: ToolMode) => void;
+  /** Desliga a guia de enquadramento de impressão sobre o mapa */
+  onCloseFrameOverlay: () => void;
+  /** Reabre o compositor de impressão (depois de ajustar o enquadramento) */
+  onOpenPrintModal: () => void;
   onRequestLabelInput: (params: {
     title: string;
     defaultValue: string;
@@ -110,6 +114,8 @@ export const CadastralMapCanvas: React.FC<CadastralMapCanvasProps> = ({
   onVisibleStreetsChange,
   onRequestLabelInput,
   onRequestToolChange,
+  onCloseFrameOverlay,
+  onOpenPrintModal,
   mapBridgeRef,
 }) => {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -967,6 +973,20 @@ export const CadastralMapCanvas: React.FC<CadastralMapCanvasProps> = ({
     ? getMapFrameViewportCrop(containerDims.w, containerDims.h, project.printConfig)
     : null;
 
+  // Esc fecha a guia de impressão enquanto ela estiver visível
+  const frameOverlayActive = project.printConfig.showFrameOverlay;
+  useEffect(() => {
+    if (!frameOverlayActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      onCloseFrameOverlay();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [frameOverlayActive, onCloseFrameOverlay]);
+
   return (
     <div
       ref={wrapperRef}
@@ -995,6 +1015,30 @@ export const CadastralMapCanvas: React.FC<CadastralMapCanvasProps> = ({
               1:{approxScale.toLocaleString('pt-BR')}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Controles da guia de impressão: sempre há como sair dela */}
+      {frameCrop && (
+        <div className="absolute top-3 left-3 z-[650] flex items-center gap-1.5 no-print">
+          <button
+            type="button"
+            onClick={onOpenPrintModal}
+            title="Voltar ao compositor de impressão"
+            className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-lg border border-blue-900 transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            Concluir e imprimir
+          </button>
+          <button
+            type="button"
+            onClick={onCloseFrameOverlay}
+            title="Fechar a guia de impressão (Esc)"
+            className="flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-md shadow-lg border border-slate-300 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            Fechar guia
+          </button>
         </div>
       )}
 

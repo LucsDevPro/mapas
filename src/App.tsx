@@ -671,6 +671,8 @@ export function App() {
           onVisibleStreetsChange={setVisibleStreets}
           onRequestLabelInput={(req) => setLabelDialog(req)}
           onRequestToolChange={(tool) => setActiveTool(tool)}
+          onCloseFrameOverlay={() => handleUpdatePrintConfig({ showFrameOverlay: false })}
+          onOpenPrintModal={() => setPrintModalOpen(true)}
           mapBridgeRef={mapBridgeRef}
         />
 
