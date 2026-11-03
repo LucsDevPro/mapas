@@ -172,6 +172,45 @@ export class CadastralBaseLayer {
     return this.streetNames;
   }
 
+  /**
+   * Ângulo (em graus, de -90 a 90, no sentido horário da tela) do trecho de rua
+   * mais próximo de um ponto. Serve para alinhar um texto com a direção da rua.
+   * Retorna null se não houver rua carregada a até `maxPx` pixels do ponto.
+   */
+  public getNearestStreetAngle(latlng: L.LatLng, maxPx = 110): number | null {
+    const p = this.map.latLngToContainerPoint(latlng);
+    let bestDist = Infinity;
+    let bestAngle: number | null = null;
+    const near = 0.01; // ~1 km: descarta ruas distantes sem projetar todos os pontos
+
+    for (const tile of this.cache.values()) {
+      for (const street of tile.streets) {
+        if (!street.coords.some(([la, ln]) => Math.abs(la - latlng.lat) < near && Math.abs(ln - latlng.lng) < near)) {
+          continue;
+        }
+        const pts = street.coords.map(([la, ln]) => this.map.latLngToContainerPoint([la, ln]));
+        for (let i = 1; i < pts.length; i++) {
+          const a = pts[i - 1];
+          const b = pts[i];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len2 = dx * dx + dy * dy;
+          if (len2 < 1) continue;
+          const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+          const d = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+          if (d < bestDist) {
+            bestDist = d;
+            let ang = (Math.atan2(dy, dx) * 180) / Math.PI;
+            if (ang > 90) ang -= 180;
+            if (ang <= -90) ang += 180;
+            bestAngle = ang;
+          }
+        }
+      }
+    }
+    return bestDist <= maxPx && bestAngle !== null ? Math.round(bestAngle) : null;
+  }
+
   public destroy() {
     this.destroyed = true;
     this.map.off('moveend', this.scheduleRefresh);

@@ -28,6 +28,8 @@ export interface MapBridgeHandle {
   fitToNeighborhood: () => void;
   /** Enquadra o polígono (selecionado ou do bairro) dentro da área útil de impressão com pequena margem */
   fitToFeatureForPrint: (featureId: string | null) => boolean;
+  /** Ângulo da rua mais próxima de um ponto (graus, -90..90) ou null se não houver rua por perto */
+  getStreetAngleAt: (lat: number, lng: number) => number | null;
 }
 
 interface CadastralMapCanvasProps {
@@ -85,11 +87,19 @@ function createLabelDivIcon(feature: CadastralFeature, isSelected: boolean): L.D
     bgCss = 'padding: 1px 3px;';
   }
 
+  // Alça de rotação: aparece acima do texto selecionado e gira junto com ele.
+  // A classe no-print mantém a alça fora da prancha impressa/exportada.
+  const rotateHandle = isSelected
+    ? `<div class="no-print" style="position:absolute; left:50%; top:-17px; width:1.5px; height:15px; margin-left:-0.75px; background:#0677c5; pointer-events:none;"></div>
+       <div class="no-print" data-rot-handle="1" title="Arraste para girar (Shift = passos de 15°)" style="position:absolute; left:50%; top:-31px; width:15px; height:15px; margin-left:-7.5px; border-radius:50%; background:#0677c5; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,29,90,.45); cursor:grab; pointer-events:auto;"></div>`
+    : '';
+
   const html = `
-    <div style="transform: translate(-50%, -50%) rotate(${rot}deg); transform-origin: center center; display: inline-block; pointer-events: auto;">
+    <div data-label-wrap="1" style="position: relative; transform: translate(-50%, -50%) rotate(${rot}deg); transform-origin: center center; display: inline-block; pointer-events: auto;">
       <span class="cadastral-label-inner ${extraClass}" style="font-family: '${family}', Inter, sans-serif; font-size: ${fontSize}px; font-weight: ${weight}; color: ${st.textColor}; ${bgCss}">
         ${text}
       </span>
+      ${rotateHandle}
     </div>
   `;
 
@@ -126,6 +136,8 @@ export const CadastralMapCanvas: React.FC<CadastralMapCanvasProps> = ({
   const featureGroupRef = useRef<L.LayerGroup | null>(null);
   const shapeLayersMapRef = useRef<Map<string, L.Layer>>(new Map());
   const labelMarkersMapRef = useRef<Map<string, L.Marker>>(new Map());
+  // Depois de girar um texto, ignora o clique que o navegador dispara ao soltar o mouse
+  const suppressMapClickUntilRef = useRef(0);
 
   // Mantém refs atualizadas para callbacks de eventos do Leaflet
   const latestPropsRef = useRef({
@@ -300,6 +312,7 @@ export const CadastralMapCanvas: React.FC<CadastralMapCanvasProps> = ({
 
     // Clique direto no mapa para: desselecionar, numerar quarteirão em 1 clique ou inserir texto
     map.on('click', (e: L.LeafletMouseEvent) => {
+      if (Date.now() < suppressMapClickUntilRef.current) return;
       const {
         activeTool: tool,
         project: curProj,
@@ -558,6 +571,8 @@ export const CadastralMapCanvas: React.FC<CadastralMapCanvasProps> = ({
       },
       fitToNeighborhood,
       fitToFeatureForPrint,
+      getStreetAngleAt: (lat: number, lng: number) =>
+        cadastralBaseRef.current?.getNearestStreetAngle(L.latLng(lat, lng)) ?? null,
     };
   }, [mapBridgeRef, fitToNeighborhood, fitToFeatureForPrint]);
 
@@ -891,6 +906,65 @@ export const CadastralMapCanvas: React.FC<CadastralMapCanvasProps> = ({
 
           // Evita que o Geoman tente colocar alças de polígono sobre o divIcon
           (marker as any).pmIgnore = true;
+
+          // Alça de rotação (só existe no HTML do texto selecionado)
+          if (isSelected) {
+            marker.on('add', () => {
+              const el = marker.getElement();
+              const handle = el?.querySelector<HTMLElement>('[data-rot-handle]');
+              const wrap = el?.querySelector<HTMLElement>('[data-label-wrap]');
+              if (!handle || !wrap) return;
+              L.DomEvent.disableClickPropagation(handle);
+
+              handle.addEventListener('pointerdown', (down: PointerEvent) => {
+                down.preventDefault();
+                down.stopPropagation();
+                const rect = wrap.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                let angle = feat.style.rotation || 0;
+
+                map.dragging.disable();
+                marker.dragging?.disable();
+                try {
+                  handle.setPointerCapture(down.pointerId);
+                } catch {
+                  // noop
+                }
+
+                const onMove = (e: PointerEvent) => {
+                  let a = (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI + 90;
+                  if (a > 180) a -= 360;
+                  if (a <= -180) a += 360;
+                  if (e.shiftKey) {
+                    a = Math.round(a / 15) * 15;
+                  } else {
+                    // "ímã" leve nas posições horizontal e vertical
+                    for (const target of [-180, -90, 0, 90, 180]) {
+                      if (Math.abs(a - target) < 4) a = target;
+                    }
+                  }
+                  angle = Math.round(a);
+                  wrap.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+                };
+                const onUp = () => {
+                  handle.removeEventListener('pointermove', onMove);
+                  handle.removeEventListener('pointerup', onUp);
+                  handle.removeEventListener('pointercancel', onUp);
+                  map.dragging.enable();
+                  marker.dragging?.enable();
+                  suppressMapClickUntilRef.current = Date.now() + 350;
+                  latestPropsRef.current.onUpdateFeature(feat.id, (prev) => ({
+                    ...prev,
+                    style: { ...prev.style, rotation: angle },
+                  }));
+                };
+                handle.addEventListener('pointermove', onMove);
+                handle.addEventListener('pointerup', onUp);
+                handle.addEventListener('pointercancel', onUp);
+              });
+            });
+          }
 
           marker.on('click', (ev: L.LeafletMouseEvent) => {
             const curTool = latestPropsRef.current.activeTool;

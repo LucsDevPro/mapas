@@ -611,6 +611,31 @@ export function App() {
   const selectedFeature =
     activeProject.features.find((f) => f.id === selectedFeatureId) || null;
 
+  const handleAlignSelectedToStreet = () => {
+    const f = selectedFeature;
+    if (!f) return;
+    let pos: LatLngTuple | null = null;
+    if (f.geometryType === 'Point' || f.geometryType === 'Circle') {
+      pos = f.coordinates as LatLngTuple;
+    } else if (f.geometryType === 'Polygon') {
+      pos =
+        f.labelPosition || computePolygonCentroid(f.coordinates as LatLngTuple[]);
+    }
+    if (!pos) return;
+    const angle = mapBridgeRef.current?.getStreetAngleAt(pos[0], pos[1]);
+    if (angle === null || angle === undefined) {
+      showToast(
+        'Nenhuma rua encontrada perto do texto. Arraste o texto para perto da rua (e use a planta com ruas, não o raster).'
+      );
+      return;
+    }
+    handleUpdateFeature(f.id, (prev) => ({
+      ...prev,
+      style: { ...prev.style, rotation: angle },
+    }));
+    showToast(`Texto alinhado com a rua (${angle}°).`);
+  };
+
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-100 overflow-hidden">
       {/* Painel Superior GIS */}
@@ -694,6 +719,7 @@ export function App() {
           onChangeCartography={setCartographyConfig}
           visibleStreets={visibleStreets}
           onFocusCoords={(coords, z) => mapBridgeRef.current?.flyTo(coords, z)}
+          onAlignToStreet={handleAlignSelectedToStreet}
         />
       </div>
 

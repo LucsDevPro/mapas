@@ -53,6 +53,8 @@ interface RightInspectorPanelProps {
   onChangeCartography: (cfg: CartographyConfig) => void;
   visibleStreets: string[];
   onFocusCoords: (coords: LatLngTuple, zoom?: number) => void;
+  /** Gira o elemento selecionado para ficar paralelo à rua mais próxima */
+  onAlignToStreet: () => void;
 }
 
 const FONT_OPTIONS: { value: CadastralFontFamily; label: string }[] = [
@@ -80,6 +82,7 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
   onChangeCartography,
   visibleStreets,
   onFocusCoords,
+  onAlignToStreet,
 }) => {
   const [defaultPresetTarget, setDefaultPresetTarget] = useState<
     'bairro' | 'quarteirao' | 'shape' | 'text'
@@ -659,24 +662,49 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
 
                 {/* Rotação do Texto (útil para alinhar textos manuais com ruas inclinadas) */}
                 <div>
-                  <div className="flex items-center justify-between mb-0.5">
+                  <div className="flex items-center justify-between mb-1">
                     <span className="text-[10.5px] text-slate-600">
                       Rotação ({currentStyle.rotation || 0}°)
                     </span>
-                    {currentStyle.rotation !== 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleStyleChange({ rotation: 0 })}
-                        className="text-[10px] text-blue-600 hover:underline"
-                      >
-                        0° Horizontal
-                      </button>
-                    )}
                   </div>
+                  <div className="grid grid-cols-3 gap-1 mb-1.5">
+                    {[
+                      { label: 'Horizontal', value: 0 },
+                      { label: 'Vertical ↑', value: -90 },
+                      { label: 'Vertical ↓', value: 90 },
+                    ].map((b) => (
+                      <button
+                        key={b.label}
+                        type="button"
+                        onClick={() => handleStyleChange({ rotation: b.value })}
+                        className={`text-[10.5px] font-semibold py-1 rounded border transition-colors ${
+                          (currentStyle.rotation || 0) === b.value
+                            ? 'bg-blue-600 text-white border-blue-700'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedFeature && (
+                    <button
+                      type="button"
+                      onClick={onAlignToStreet}
+                      title="Gira o texto para ficar paralelo à rua mais próxima dele"
+                      className="w-full mb-1.5 text-[11px] font-bold py-1.5 rounded border border-blue-700 bg-blue-50 text-blue-800 hover:bg-blue-100 transition-colors"
+                    >
+                      Alinhar à rua mais próxima
+                    </button>
+                  )}
+                  <p className="text-[10px] text-slate-500 mb-1">
+                    Dica: arraste a bolinha azul acima do texto no mapa para girar livremente
+                    (Shift = passos de 15°).
+                  </p>
                   <input
                     type="range"
-                    min={-90}
-                    max={90}
+                    min={-180}
+                    max={180}
                     step={1}
                     value={currentStyle.rotation || 0}
                     onChange={(e) =>
