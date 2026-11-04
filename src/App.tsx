@@ -611,6 +611,17 @@ export function App() {
   const selectedFeature =
     activeProject.features.find((f) => f.id === selectedFeatureId) || null;
 
+  const handleClearAllFeatures = () => {
+    const total = activeProject.features.length;
+    if (total === 0) return;
+    mutateActiveProject(
+      (prev) => ({ ...prev, features: [], nextBlockNumber: 1 }),
+      true // entra no histórico: Ctrl+Z restaura tudo
+    );
+    setSelectedFeatureId(null);
+    showToast(`${total} marcações apagadas. Ctrl+Z desfaz.`);
+  };
+
   const handleAlignSelectedToStreet = () => {
     const f = selectedFeature;
     if (!f) return;
@@ -720,6 +731,8 @@ export function App() {
           visibleStreets={visibleStreets}
           onFocusCoords={(coords, z) => mapBridgeRef.current?.flyTo(coords, z)}
           onAlignToStreet={handleAlignSelectedToStreet}
+          onSelectTool={(tool) => setActiveTool(tool)}
+          onClearAllFeatures={handleClearAllFeatures}
         />
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Sliders,
   Map as MapIcon,
@@ -55,6 +55,10 @@ interface RightInspectorPanelProps {
   onFocusCoords: (coords: LatLngTuple, zoom?: number) => void;
   /** Gira o elemento selecionado para ficar paralelo à rua mais próxima */
   onAlignToStreet: () => void;
+  /** Troca a ferramenta ativa da barra lateral esquerda */
+  onSelectTool: (tool: ToolMode) => void;
+  /** Apaga todas as marcações do mapa (pode ser desfeito com Ctrl+Z) */
+  onClearAllFeatures: () => void;
 }
 
 const FONT_OPTIONS: { value: CadastralFontFamily; label: string }[] = [
@@ -83,11 +87,19 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
   visibleStreets,
   onFocusCoords,
   onAlignToStreet,
+  onSelectTool,
+  onClearAllFeatures,
 }) => {
   const [defaultPresetTarget, setDefaultPresetTarget] = useState<
     'bairro' | 'quarteirao' | 'shape' | 'text'
   >('quarteirao');
   const [streetFilter, setStreetFilter] = useState('');
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  // A confirmação some ao trocar de aba ou de mapa, para nunca ficar "armada" por engano
+  useEffect(() => {
+    setConfirmClear(false);
+  }, [activeTab, project.id]);
 
   if (!isOpen) {
     return (
@@ -307,9 +319,11 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
                   <button
                     key={opt.label}
                     type="button"
-                    onClick={() =>
-                      onUpdateProjectMeta((p) => ({ ...p, blockPrefix: opt.prefix }))
-                    }
+                    onClick={() => {
+                      onUpdateProjectMeta((p) => ({ ...p, blockPrefix: opt.prefix }));
+                      // Escolher o formato já ativa a ferramenta "Numerar Quadras"
+                      onSelectTool('quarteirao_num');
+                    }}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors ${
                       project.blockPrefix === opt.prefix
                         ? 'bg-red-50 border-red-300 text-red-700 font-semibold'
@@ -948,9 +962,53 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
 
         {activeTab === 'layers' && (
           <div className="space-y-2">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Elementos neste Bairro ({project.features.length})
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Elementos neste Bairro ({project.features.length})
+              </div>
+              {project.features.length > 0 && !confirmClear && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmClear(true)}
+                  title="Apaga todos os desenhos, números e textos deste mapa"
+                  className="flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded border border-rose-300 text-rose-700 bg-white hover:bg-rose-50 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Zerar marcações
+                </button>
+              )}
             </div>
+
+            {project.features.length > 0 && confirmClear && (
+              <div className="rounded-lg border border-rose-300 bg-rose-50 p-2.5 space-y-2">
+                <div className="text-[11.5px] font-semibold text-rose-900">
+                  Apagar todas as {project.features.length} marcações deste mapa?
+                </div>
+                <div className="text-[10.5px] text-rose-800">
+                  Inclui o perímetro do bairro, quadras, números e textos. A numeração
+                  volta ao 1. Dá para desfazer com Ctrl+Z.
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClearAllFeatures();
+                      setConfirmClear(false);
+                    }}
+                    className="flex-1 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition-colors"
+                  >
+                    Sim, apagar tudo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClear(false)}
+                    className="flex-1 py-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-[11px] font-semibold transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
 
             {project.features.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-slate-500 space-y-1">
