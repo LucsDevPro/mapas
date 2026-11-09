@@ -183,3 +183,8 @@
     page-break-inside: avoid !important;
   }
 }
+
+/* Base raster em tons de cinza: visual de planta limpa */
+.tiles-gray {
+  filter: grayscale(1) contrast(0.9) brightness(1.08);
+}

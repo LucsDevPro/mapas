@@ -9,7 +9,11 @@ import {
   NeighborhoodMapProject,
   ToolMode,
 } from '../types/gis';
-import { CadastralBaseLayer } from '../map/leafletCadastralBase';
+import {
+  CadastralBaseLayer,
+  OSM_RASTER_OPTIONS,
+  OSM_RASTER_URL,
+} from '../map/leafletCadastralBase';
 import {
   computeGraphicScaleBar,
   computePolygonCentroid,
@@ -600,16 +604,7 @@ export const CadastralMapCanvas: React.FC<CadastralMapCanvasProps> = ({
       cadastralBaseRef.current?.destroy();
       cadastralBaseRef.current = null;
       if (!rasterLayerRef.current) {
-        rasterLayerRef.current = L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-          {
-            subdomains: 'abcd',
-            maxZoom: 20,
-            maxNativeZoom: 19,
-            crossOrigin: true,
-            attribution: '© OpenStreetMap • © CARTO',
-          }
-        ).addTo(map);
+        rasterLayerRef.current = L.tileLayer(OSM_RASTER_URL, OSM_RASTER_OPTIONS).addTo(map);
       }
       return;
     }

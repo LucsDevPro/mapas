@@ -73,7 +73,16 @@ export interface CartographyConfig {
   streetNameScale: number; // 0.85 .. 1.65
   streetNameBold: boolean;
   streetLineContrast: 'light' | 'medium' | 'dark';
-  streetLabelSpacing: number; // px spacing along line (e.g., 150..320)
+  /** Quantidade de nomes repetidos ao longo de cada rua: 1 (poucos) .. 5 (máximo) */
+  streetLabelDensity: 1 | 2 | 3 | 4 | 5;
+  /** Fonte dos nomes das ruas (painel "Nomes das Ruas") */
+  streetFontFamily: CadastralFontFamily;
+  /** Cor do texto dos nomes das ruas */
+  streetNameColor: string;
+  /** Contorno branco atrás das letras, para ler por cima das linhas */
+  streetNameHalo: boolean;
+  /** Escreve os nomes em MAIÚSCULAS */
+  streetNameUppercase: boolean;
   showBuildings: boolean;
   paperTone: 'pure_white' | 'soft_block';
 }
@@ -119,7 +128,11 @@ export const DEFAULT_CARTOGRAPHY_CONFIG: CartographyConfig = {
   streetNameScale: 1.15,
   streetNameBold: true,
   streetLineContrast: 'medium',
-  streetLabelSpacing: 90,
+  streetLabelDensity: 4,
+  streetFontFamily: 'Inter',
+  streetNameColor: '#111827',
+  streetNameHalo: true,
+  streetNameUppercase: false,
   showBuildings: false,
   paperTone: 'pure_white',
 };

@@ -15,6 +15,21 @@ const TILEJSON_URL = 'https://tiles.openfreemap.org/planet';
 const FALLBACK_TILE_TEMPLATE =
   'https://tiles.openfreemap.org/planet/20261025_080012_pt/{z}/{x}/{y}.pbf';
 
+/**
+ * Base raster de contingência / preset "Base Cartográfica Limpa".
+ * Usa o OpenStreetMap padrão, que não exige chave de API. (O CARTO passou a exigir chave
+ * e desenha a marca "API KEY REQUIRED" por cima dos mapas sem ela.)
+ * A classe "tiles-gray" deixa os tiles em tons de cinza, no estilo de planta limpa.
+ */
+export const OSM_RASTER_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+export const OSM_RASTER_OPTIONS: L.TileLayerOptions = {
+  maxZoom: 20,
+  maxNativeZoom: 19,
+  crossOrigin: true,
+  className: 'tiles-gray',
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+};
+
 const MAJOR_CLASSES = new Set([
   'motorway',
   'trunk',
@@ -145,15 +160,30 @@ export class CadastralBaseLayer {
   }
 
   public setConfig(config: CartographyConfig) {
+    const familyChanged = config.streetFontFamily !== this.config.streetFontFamily;
     this.config = config;
     this.refresh();
+    // Fontes da web carregam sob demanda: ao trocar de fonte, redesenha quando ela estiver pronta
+    // (senão as larguras dos nomes seriam medidas com a fonte errada e os nomes se sobreporiam)
+    if (familyChanged && document.fonts?.load) {
+      const f = config.streetFontFamily;
+      Promise.all([
+        document.fonts.load(`500 12px "${f}"`),
+        document.fonts.load(`700 12px "${f}"`),
+      ])
+        .then(() => {
+          if (!this.destroyed && this.config.streetFontFamily === f) this.refresh();
+        })
+        .catch(() => undefined);
+    }
   }
 
   private computeKey(): string {
     const c = this.map.getCenter();
+    const k = this.config;
     return `${c.lat.toFixed(5)}|${c.lng.toFixed(5)}|${this.map
       .getZoom()
-      .toFixed(2)}|${this.config.streetNameScale}|${this.config.streetLabelSpacing}|${this.config.streetNameBold}`;
+      .toFixed(2)}|${k.streetNameScale}|${k.streetLabelDensity}|${k.streetNameBold}|${k.streetFontFamily}|${k.streetNameColor}|${k.streetNameHalo}|${k.streetNameUppercase}`;
   }
 
   /** Aguarda o carregamento/renderização dos tiles (útil antes de imprimir ou exportar) */
@@ -380,6 +410,12 @@ export class CadastralBaseLayer {
     };
   }
 
+  /** Espaço livre (px) entre o fim de um nome e o começo do próximo na mesma rua */
+  private getLabelGap(): number {
+    const gaps = [0, 420, 240, 140, 80, 30]; // índice = nível de 1 (poucos) a 5 (máximo)
+    return gaps[Math.max(1, Math.min(5, Math.round(this.config.streetLabelDensity || 4)))];
+  }
+
   public refresh(): Promise<void> {
     const run = this.doRefresh().catch(() => undefined);
     this.pendingRefresh = run;
@@ -442,17 +478,11 @@ export class CadastralBaseLayer {
     // Ativa camada raster de emergência somente se a base vetorial falhar por completo
     if (totalStreets === 0) {
       if (!this.fallbackLayer) {
-        this.fallbackLayer = L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-          {
-            subdomains: 'abcd',
-            maxZoom: 20,
-            maxNativeZoom: 19,
-            crossOrigin: true,
-            attribution: '© OpenStreetMap • © CARTO',
-            pane: 'tilePane',
-          }
-        ).addTo(this.map);
+        // OpenStreetMap padrão: não exige chave de API (o CARTO passou a exigir)
+        this.fallbackLayer = L.tileLayer(OSM_RASTER_URL, {
+          ...OSM_RASTER_OPTIONS,
+          pane: 'tilePane',
+        }).addTo(this.map);
       }
       this.working = false;
       this.completedKey = startedKey;
@@ -489,8 +519,14 @@ export class CadastralBaseLayer {
     const namesFound = new Set<string>();
     const occupied: { x0: number; y0: number; x1: number; y1: number }[] = [];
     const ctx = this.measureCanvas.getContext('2d');
-    const spacing = Math.max(45, Math.min(300, this.config.streetLabelSpacing || 110));
+    const gap = this.getLabelGap();
+    const fontFamily = `"${this.config.streetFontFamily || 'Inter'}", Inter, "Noto Sans", sans-serif`;
+    const textColor = /^#[0-9a-fA-F]{6}$/.test(this.config.streetNameColor)
+      ? this.config.streetNameColor
+      : '#111827';
     const viewport = L.bounds([0, 0], [size.x, size.y]);
+    const placedByName = new Map<string, { x: number; y: number }[]>();
+    const MAX_LABELS = 1200;
     let labelCount = 0;
 
     // Prioriza avenidas/ruas principais e depois as locais
@@ -505,7 +541,10 @@ export class CadastralBaseLayer {
     for (const street of sortedLabels) {
       if (!street.name) continue;
       namesFound.add(street.name);
-      if (labelCount >= 480) continue;
+      if (labelCount >= MAX_LABELS) continue;
+      const shownName = this.config.streetNameUppercase
+        ? street.name.toLocaleUpperCase('pt-BR')
+        : street.name;
 
       const pts = street.coords.map(([lat, lng]) =>
         this.map.latLngToContainerPoint(L.latLng(lat, lng))
@@ -522,21 +561,24 @@ export class CadastralBaseLayer {
 
       const { size: fontSize, weight } = this.getLabelFont(street.klass);
       if (ctx) {
-        ctx.font = `${weight} ${fontSize}px Inter, "Noto Sans", sans-serif`;
+        ctx.font = `${weight} ${fontSize}px ${fontFamily}`;
       }
       const textWidth = ctx
-        ? ctx.measureText(street.name).width
-        : street.name.length * fontSize * 0.55;
+        ? ctx.measureText(shownName).width
+        : shownName.length * fontSize * 0.55;
       const textHeight = fontSize * 1.32;
 
-      const effectiveSpacing = Math.max(spacing, textWidth + 34);
-      const attempts = Math.max(1, Math.floor(total / effectiveSpacing));
+      // Passo entre nomes = largura do nome + espaço livre escolhido. Assim TODOS os níveis
+      // do controle mudam o resultado (antes, o piso "largura + 34" anulava metade do controle).
+      const effectiveSpacing = textWidth + gap;
+      const attempts = Math.max(1, Math.floor((total + gap) / effectiveSpacing));
+
+      // Distribui os nomes centralizados ao longo da rua, com o espaço livre igual entre eles
+      const usedLength = attempts * effectiveSpacing - gap;
+      const startOffset = Math.max(0, (total - usedLength) / 2);
 
       for (let a = 0; a < attempts; a++) {
-        const targetDist =
-          attempts === 1
-            ? total / 2
-            : effectiveSpacing * (a + 0.5) + (total % effectiveSpacing) / 2;
+        const targetDist = startOffset + textWidth / 2 + a * effectiveSpacing;
         let dist = 0;
         let segIndex = 0;
         for (; segIndex < pts.length - 1; segIndex++) {
@@ -586,16 +628,29 @@ export class CadastralBaseLayer {
         );
         if (collides) continue;
 
+        // Uma rua cortada em vários tiles gera trechos separados: mantém o espaço escolhido
+        // também entre o último nome de um trecho e o primeiro do trecho vizinho
+        const sameName = placedByName.get(street.name) ?? [];
+        const tooCloseToSame = sameName.some(
+          (q) => Math.hypot(q.x - cx, q.y - cy) < textWidth + gap * 0.6
+        );
+        if (tooCloseToSame) continue;
+        sameName.push({ x: cx, y: cy });
+        placedByName.set(street.name, sameName);
+
         occupied.push(rect);
         labelCount += 1;
 
         const halo = 'rgba(255,255,255,1)';
+        const haloCss = this.config.streetNameHalo
+          ? `text-shadow: 0 0 2px ${halo}, 0 0 3px ${halo}, 1px 1px 0 ${halo}, -1px 1px 0 ${halo}, 1px -1px 0 ${halo}, -1px -1px 0 ${halo};`
+          : '';
         const icon = L.divIcon({
           className: 'cadastral-street-label',
           html: `<div style="transform: translate(-50%,-50%) rotate(${angle.toFixed(
             2
           )}deg); transform-origin: center center; white-space: nowrap; pointer-events: none;">
-              <span style="font-family: Inter, 'Noto Sans', sans-serif; font-size: ${fontSize}px; font-weight: ${weight}; color: #111827; letter-spacing: 0.01em; text-shadow: 0 0 2px ${halo}, 0 0 3px ${halo}, 1px 1px 0 ${halo}, -1px 1px 0 ${halo}, 1px -1px 0 ${halo}, -1px -1px 0 ${halo};">${street.name
+              <span style="font-family: ${fontFamily.replace(/"/g, "'")}; font-size: ${fontSize}px; font-weight: ${weight}; color: ${textColor}; letter-spacing: 0.01em; ${haloCss}">${shownName
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')}</span>

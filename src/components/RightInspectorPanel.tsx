@@ -12,6 +12,7 @@ import {
   RotateCcw,
   CopyCheck,
   Hash,
+  Type,
 } from 'lucide-react';
 import {
   CADASTRAL_COLOR_SWATCHES,
@@ -33,7 +34,7 @@ import {
   formatDistance,
 } from '../utils/geometryAndGeoJson';
 
-export type InspectorTab = 'style' | 'cartography' | 'layers';
+export type InspectorTab = 'style' | 'cartography' | 'streets' | 'layers';
 
 interface RightInspectorPanelProps {
   isOpen: boolean;
@@ -192,7 +193,7 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
           }`}
         >
           <Sliders className="w-3.5 h-3.5" />
-          <span>Estilo & Quadras</span>
+          <span>Estilo</span>
         </button>
         <button
           type="button"
@@ -204,7 +205,20 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
           }`}
         >
           <MapIcon className="w-3.5 h-3.5" />
-          <span>Planta & Ruas</span>
+          <span>Planta</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onChangeTab('streets')}
+          title="Fonte, tamanho e frequência dos nomes das ruas"
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 text-[11px] font-semibold rounded-t-md border-b-2 transition-colors ${
+            activeTab === 'streets'
+              ? 'bg-white text-blue-700 border-blue-600'
+              : 'text-slate-600 border-transparent hover:text-slate-900'
+          }`}
+        >
+          <Type className="w-3.5 h-3.5" />
+          <span>Ruas</span>
         </button>
         <button
           type="button"
@@ -819,30 +833,6 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
 
               {cartographyConfig.preset !== 'osm_clean_raster' && (
                 <>
-                  {/* Tamanho dos Nomes das Ruas */}
-                  <div className="pt-1">
-                    <div className="flex justify-between text-[11px] font-medium text-slate-700 mb-0.5">
-                      <span>Tamanho Fixo dos Nomes das Ruas</span>
-                      <span className="font-bold text-blue-700">
-                        {Math.round(cartographyConfig.streetNameScale * 100)}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.85}
-                      max={1.7}
-                      step={0.05}
-                      value={cartographyConfig.streetNameScale}
-                      onChange={(e) =>
-                        onChangeCartography({
-                          ...cartographyConfig,
-                          streetNameScale: Number(e.target.value),
-                        })
-                      }
-                      className="w-full accent-blue-600"
-                    />
-                  </div>
-
                   {/* Espessura / Contraste das Ruas */}
                   <div>
                     <label className="block text-[11px] font-medium text-slate-700 mb-1">
@@ -877,51 +867,13 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Densidade de Repetição dos Nomes das Ruas */}
-                  <div>
-                    <div className="flex justify-between text-[11px] font-medium text-slate-700 mb-0.5">
-                      <span>Frequência dos Nomes nas Ruas</span>
-                      <span className="text-[10.5px] text-slate-500">
-                        {cartographyConfig.streetLabelSpacing <= 90
-                          ? 'Máxima'
-                          : cartographyConfig.streetLabelSpacing <= 150
-                          ? 'Padrão'
-                          : 'Espaçada'}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={40}
-                      max={260}
-                      step={10}
-                      value={cartographyConfig.streetLabelSpacing}
-                      onChange={(e) =>
-                        onChangeCartography({
-                          ...cartographyConfig,
-                          streetLabelSpacing: Number(e.target.value),
-                        })
-                      }
-                      className="w-full accent-blue-600"
-                    />
-                  </div>
-
-                  {/* Negrito nos Nomes das Ruas */}
-                  <label className="flex items-center gap-2 pt-0.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cartographyConfig.streetNameBold}
-                      onChange={(e) =>
-                        onChangeCartography({
-                          ...cartographyConfig,
-                          streetNameBold: e.target.checked,
-                        })
-                      }
-                      className="rounded accent-blue-600"
-                    />
-                    <span className="text-xs font-medium text-slate-700">
-                      Nomes das ruas em fonte Negrito (Alta Nitidez)
-                    </span>
-                  </label>
+                  <button
+                    type="button"
+                    onClick={() => onChangeTab('streets')}
+                    className="w-full text-left text-[11px] font-semibold text-blue-700 hover:underline pt-0.5"
+                  >
+                    Fonte, tamanho e frequência dos nomes das ruas → aba “Ruas”
+                  </button>
                 </>
               )}
             </div>
@@ -956,6 +908,268 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'streets' && (
+          <div className="space-y-3.5">
+            <div className="rounded-lg border border-slate-200 p-2.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                  Nomes das Ruas
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onChangeCartography({
+                      ...cartographyConfig,
+                      streetNameScale: DEFAULT_CARTOGRAPHY_CONFIG.streetNameScale,
+                      streetNameBold: DEFAULT_CARTOGRAPHY_CONFIG.streetNameBold,
+                      streetLabelDensity: DEFAULT_CARTOGRAPHY_CONFIG.streetLabelDensity,
+                      streetFontFamily: DEFAULT_CARTOGRAPHY_CONFIG.streetFontFamily,
+                      streetNameColor: DEFAULT_CARTOGRAPHY_CONFIG.streetNameColor,
+                      streetNameHalo: DEFAULT_CARTOGRAPHY_CONFIG.streetNameHalo,
+                      streetNameUppercase: DEFAULT_CARTOGRAPHY_CONFIG.streetNameUppercase,
+                    })
+                  }
+                  title="Voltar ao padrão dos nomes das ruas"
+                  className="text-[10.5px] text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Padrão</span>
+                </button>
+              </div>
+
+              {cartographyConfig.preset === 'osm_clean_raster' ? (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5 space-y-1.5">
+                  <div className="text-[11.5px] font-semibold text-amber-900">
+                    Os nomes das ruas já vêm desenhados na base raster.
+                  </div>
+                  <div className="text-[10.5px] text-amber-800">
+                    Para ajustar fonte, cor e frequência, use uma planta vetorial.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onChangeCartography({ ...cartographyConfig, preset: 'cadastral_clean' })
+                    }
+                    className="w-full py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition-colors"
+                  >
+                    Usar Planta Cadastral Pura
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Pré-visualização */}
+                  <div className="relative h-16 rounded-md border border-slate-200 bg-white overflow-hidden flex items-center justify-center">
+                    <div
+                      className="absolute left-0 right-0 top-1/2 h-px bg-slate-300"
+                      style={{ transform: 'rotate(-8deg)' }}
+                    />
+                    <span
+                      className="relative whitespace-nowrap"
+                      style={{
+                        transform: 'rotate(-8deg)',
+                        fontFamily: `"${cartographyConfig.streetFontFamily}", Inter, sans-serif`,
+                        fontSize: `${Math.round(12.4 * cartographyConfig.streetNameScale * 10) / 10}px`,
+                        fontWeight: cartographyConfig.streetNameBold ? 700 : 500,
+                        color: cartographyConfig.streetNameColor,
+                        textShadow: cartographyConfig.streetNameHalo
+                          ? '0 0 2px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px 1px 0 #fff, 1px -1px 0 #fff, -1px -1px 0 #fff'
+                          : 'none',
+                      }}
+                    >
+                      {cartographyConfig.streetNameUppercase
+                        ? 'AVENIDA MARCELINO PIRES'
+                        : 'Avenida Marcelino Pires'}
+                    </span>
+                  </div>
+
+                  {/* Fonte */}
+                  <div>
+                    <div className="text-[11px] font-medium text-slate-700 mb-1">Fonte</div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {FONT_OPTIONS.map((f) => (
+                        <button
+                          key={f.value}
+                          type="button"
+                          onClick={() =>
+                            onChangeCartography({ ...cartographyConfig, streetFontFamily: f.value })
+                          }
+                          style={{ fontFamily: `"${f.value}", sans-serif` }}
+                          className={`py-1.5 px-1 rounded border text-[11.5px] font-semibold transition-colors ${
+                            cartographyConfig.streetFontFamily === f.value
+                              ? 'bg-blue-600 text-white border-blue-700'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          {f.value}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tamanho */}
+                  <div>
+                    <div className="flex justify-between text-[11px] font-medium text-slate-700 mb-0.5">
+                      <span>Tamanho</span>
+                      <span className="font-bold text-blue-700">
+                        {Math.round(cartographyConfig.streetNameScale * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.85}
+                      max={1.7}
+                      step={0.05}
+                      value={cartographyConfig.streetNameScale}
+                      onChange={(e) =>
+                        onChangeCartography({
+                          ...cartographyConfig,
+                          streetNameScale: Number(e.target.value),
+                        })
+                      }
+                      className="w-full accent-blue-600"
+                    />
+                  </div>
+
+                  {/* Peso e caixa */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-700 mb-1">Peso</div>
+                      <div className="grid grid-cols-2 gap-1">
+                        {[
+                          { label: 'Normal', v: false },
+                          { label: 'Negrito', v: true },
+                        ].map((o) => (
+                          <button
+                            key={o.label}
+                            type="button"
+                            onClick={() =>
+                              onChangeCartography({ ...cartographyConfig, streetNameBold: o.v })
+                            }
+                            className={`py-1 rounded border text-[10.5px] font-semibold transition-colors ${
+                              cartographyConfig.streetNameBold === o.v
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-700 mb-1">Letras</div>
+                      <div className="grid grid-cols-2 gap-1">
+                        {[
+                          { label: 'Aa', v: false },
+                          { label: 'AA', v: true },
+                        ].map((o) => (
+                          <button
+                            key={o.label}
+                            type="button"
+                            title={o.v ? 'Tudo em maiúsculas' : 'Como no mapa (maiúsculas e minúsculas)'}
+                            onClick={() =>
+                              onChangeCartography({ ...cartographyConfig, streetNameUppercase: o.v })
+                            }
+                            className={`py-1 rounded border text-[10.5px] font-semibold transition-colors ${
+                              cartographyConfig.streetNameUppercase === o.v
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cor */}
+                  <div>
+                    <div className="text-[11px] font-medium text-slate-700 mb-1">Cor do texto</div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {['#111827', '#374151', '#001d5a', '#0b4a8f', '#9f1239', '#166534'].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          title={c}
+                          onClick={() =>
+                            onChangeCartography({ ...cartographyConfig, streetNameColor: c })
+                          }
+                          style={{ backgroundColor: c }}
+                          className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                            cartographyConfig.streetNameColor.toLowerCase() === c
+                              ? 'border-blue-500 scale-110'
+                              : 'border-white shadow ring-1 ring-slate-300'
+                          }`}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        value={cartographyConfig.streetNameColor}
+                        onChange={(e) =>
+                          onChangeCartography({ ...cartographyConfig, streetNameColor: e.target.value })
+                        }
+                        title="Outra cor"
+                        className="w-7 h-7 rounded cursor-pointer border border-slate-300 bg-white p-0.5"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Contorno */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cartographyConfig.streetNameHalo}
+                      onChange={(e) =>
+                        onChangeCartography({ ...cartographyConfig, streetNameHalo: e.target.checked })
+                      }
+                      className="rounded accent-blue-600"
+                    />
+                    <span className="text-xs font-medium text-slate-700">
+                      Contorno branco nas letras (lê melhor sobre as linhas)
+                    </span>
+                  </label>
+
+                  {/* Quantidade de nomes por rua */}
+                  <div>
+                    <div className="flex justify-between text-[11px] font-medium text-slate-700 mb-1">
+                      <span>Quantos nomes em cada rua</span>
+                      <span className="text-[10.5px] text-slate-500">
+                        {['', 'Poucos', 'Alguns', 'Médio', 'Muitos', 'Máximo'][
+                          cartographyConfig.streetLabelDensity
+                        ]}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1">
+                      {([1, 2, 3, 4, 5] as const).map((lvl) => (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() =>
+                            onChangeCartography({ ...cartographyConfig, streetLabelDensity: lvl })
+                          }
+                          title={['', 'Poucos', 'Alguns', 'Médio', 'Muitos', 'Máximo'][lvl]}
+                          className={`py-1 rounded border text-[11px] font-bold transition-colors ${
+                            cartographyConfig.streetLabelDensity === lvl
+                              ? 'bg-blue-600 text-white border-blue-700'
+                              : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          {lvl}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      1 = um nome por trecho de rua · 5 = repete o nome o máximo possível, sem
+                      sobrepor.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
