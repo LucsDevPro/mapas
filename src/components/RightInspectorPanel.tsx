@@ -470,111 +470,155 @@ export const RightInspectorPanel: React.FC<RightInspectorPanelProps> = ({
                 </div>
               )}
 
-              {/* Controles de Contorno e Preenchimento (quando aplicável a polígonos/linhas/círculos) */}
-              {(!selectedFeature || selectedFeature.geometryType !== 'Point') && (
-                <div className="rounded-lg border border-slate-200 p-2.5 space-y-2.5">
-                  <div className="text-[11px] font-bold text-slate-700">
-                    Cores de Contorno e Transparência
-                  </div>
-
-                  {/* Cor da Borda */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] text-slate-600">Cor do Contorno</span>
-                      <input
-                        type="color"
-                        value={currentStyle.strokeColor}
-                        onChange={(e) =>
-                          handleStyleChange({
-                            strokeColor: e.target.value,
-                            fillColor: e.target.value,
-                          })
-                        }
-                        className="w-6 h-5 rounded cursor-pointer border border-slate-300"
+              {/* Borda e preenchimento do polígono / linha / círculo */}
+              {(!selectedFeature || selectedFeature.geometryType !== 'Point') && (() => {
+                const strokeC = currentStyle.strokeColor;
+                const fillC = currentStyle.fillColor || strokeC;
+                const setBoth = (c: string) =>
+                  handleStyleChange({
+                    strokeColor: c,
+                    fillColor: c,
+                    // se estava sem preenchimento, mantém assim; a cor vale quando houver opacidade
+                  });
+                const setFill = (c: string) =>
+                  handleStyleChange({
+                    fillColor: c,
+                    // se estava 100% transparente, a troca de cor não apareceria: dá um tom visível
+                    ...((currentStyle.fillOpacity ?? 0) < 0.05 ? { fillOpacity: 0.25 } : {}),
+                  });
+                const swatchRow = (active: string, onPick: (c: string) => void) => (
+                  <div className="flex flex-wrap gap-1.5">
+                    {CADASTRAL_COLOR_SWATCHES.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        title={c}
+                        onClick={() => onPick(c)}
+                        style={{ backgroundColor: c }}
+                        className={`w-5 h-5 rounded-full border-2 transition-transform ${
+                          active.toLowerCase() === c.toLowerCase()
+                            ? 'border-slate-900 scale-110'
+                            : 'border-white shadow-xs'
+                        }`}
                       />
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {CADASTRAL_COLOR_SWATCHES.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() =>
-                            handleStyleChange({ strokeColor: c, fillColor: c })
-                          }
-                          style={{ backgroundColor: c }}
-                          className={`w-5 h-5 rounded-full border-2 transition-transform ${
-                            currentStyle.strokeColor.toLowerCase() === c.toLowerCase()
-                              ? 'border-slate-900 scale-110'
-                              : 'border-white shadow-xs'
-                          }`}
-                        />
-                      ))}
-                    </div>
+                    ))}
                   </div>
+                );
+                return (
+                  <div className="rounded-lg border border-slate-200 p-2.5 space-y-3">
+                    <div className="text-[11px] font-bold text-slate-700">
+                      Borda e Preenchimento do Polígono
+                    </div>
 
-                  {/* Espessura e Tipo de Linha */}
-                  <div className="grid grid-cols-2 gap-2">
+                    {/* Cor do polígono: muda borda e preenchimento juntos */}
                     <div>
-                      <label className="block text-[10.5px] text-slate-600 mb-0.5">
-                        Espessura ({currentStyle.strokeWidth}px)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-medium text-slate-700">
+                          Cor do polígono
+                        </span>
+                        <input
+                          type="color"
+                          value={strokeC}
+                          onChange={(e) => setBoth(e.target.value)}
+                          title="Escolher outra cor (borda e preenchimento)"
+                          className="w-7 h-6 rounded cursor-pointer border border-slate-300 bg-white p-0.5"
+                        />
+                      </div>
+                      {swatchRow(strokeC, setBoth)}
+                    </div>
+
+                    {/* Espessura e traçado */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="flex justify-between text-[11px] font-medium text-slate-700 mb-0.5">
+                          <span>Espessura da borda</span>
+                          <span className="font-bold text-blue-700">{currentStyle.strokeWidth}px</span>
+                        </label>
+                        <input
+                          type="range"
+                          min={0.5}
+                          max={12}
+                          step={0.5}
+                          value={currentStyle.strokeWidth}
+                          onChange={(e) =>
+                            handleStyleChange({ strokeWidth: Number(e.target.value) })
+                          }
+                          className="w-full accent-blue-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-0.5">
+                          Traçado
+                        </label>
+                        <select
+                          value={currentStyle.dashArray}
+                          onChange={(e) => handleStyleChange({ dashArray: e.target.value })}
+                          className="w-full bg-white border border-slate-300 rounded px-1.5 py-1 text-[11px]"
+                        >
+                          <option value="">Contínuo</option>
+                          <option value="10, 6">Tracejado</option>
+                          <option value="3, 5">Pontilhado</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Ajuste separado: borda numa cor, preenchimento em outra */}
+                    <details className="group">
+                      <summary className="cursor-pointer text-[11px] font-semibold text-blue-700 hover:underline select-none">
+                        Borda e preenchimento em cores diferentes
+                      </summary>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <label className="flex items-center justify-between gap-2 text-[11px] text-slate-700 bg-slate-50 border border-slate-200 rounded px-2 py-1.5">
+                          <span>Só a borda</span>
+                          <input
+                            type="color"
+                            value={strokeC}
+                            onChange={(e) => handleStyleChange({ strokeColor: e.target.value })}
+                            className="w-7 h-6 rounded cursor-pointer border border-slate-300 bg-white p-0.5"
+                          />
+                        </label>
+                        <label className="flex items-center justify-between gap-2 text-[11px] text-slate-700 bg-slate-50 border border-slate-200 rounded px-2 py-1.5">
+                          <span>Só o fundo</span>
+                          <input
+                            type="color"
+                            value={fillC}
+                            onChange={(e) => setFill(e.target.value)}
+                            className="w-7 h-6 rounded cursor-pointer border border-slate-300 bg-white p-0.5"
+                          />
+                        </label>
+                      </div>
+                    </details>
+
+                    {/* Transparência do preenchimento */}
+                    <div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[11px] font-medium text-slate-700">
+                          Opacidade do preenchimento (
+                          {Math.round((currentStyle.fillOpacity ?? 0) * 100)}%)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleStyleChange({ fillOpacity: 0 })}
+                          className="text-[10px] font-semibold text-blue-600 hover:underline"
+                        >
+                          Sem preenchimento
+                        </button>
+                      </div>
                       <input
                         type="range"
-                        min={1}
-                        max={8}
-                        step={0.5}
-                        value={currentStyle.strokeWidth}
+                        min={0}
+                        max={0.85}
+                        step={0.02}
+                        value={currentStyle.fillOpacity}
                         onChange={(e) =>
-                          handleStyleChange({ strokeWidth: Number(e.target.value) })
+                          handleStyleChange({ fillOpacity: Number(e.target.value) })
                         }
                         className="w-full accent-blue-600"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10.5px] text-slate-600 mb-0.5">
-                        Traçado
-                      </label>
-                      <select
-                        value={currentStyle.dashArray}
-                        onChange={(e) => handleStyleChange({ dashArray: e.target.value })}
-                        className="w-full bg-white border border-slate-300 rounded px-1.5 py-1 text-[11px]"
-                      >
-                        <option value="">Contínuo</option>
-                        <option value="10, 6">Tracejado</option>
-                        <option value="3, 5">Pontilhado</option>
-                      </select>
-                    </div>
                   </div>
-
-                  {/* Preenchimento e Transparência */}
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[10.5px] text-slate-600">
-                        Opacidade do Preenchimento (
-                        {Math.round((currentStyle.fillOpacity ?? 0) * 100)}%)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleStyleChange({ fillOpacity: 0 })}
-                        className="text-[10px] font-semibold text-blue-600 hover:underline"
-                      >
-                        100% Transparente
-                      </button>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={0.65}
-                      step={0.02}
-                      value={currentStyle.fillOpacity}
-                      onChange={(e) =>
-                        handleStyleChange({ fillOpacity: Number(e.target.value) })
-                      }
-                      className="w-full accent-blue-600"
-                    />
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Tipografia: Fonte, Tamanho, Cor e Rotação dos Números e Textos */}
               <div className="rounded-lg border border-slate-200 p-2.5 space-y-2.5">

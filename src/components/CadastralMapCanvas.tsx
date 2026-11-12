@@ -1042,6 +1042,38 @@ export const CadastralMapCanvas: React.FC<CadastralMapCanvasProps> = ({
     ? getMapFrameViewportCrop(containerDims.w, containerDims.h, project.printConfig)
     : null;
 
+  // Esc durante o desenho de polígono/linha: desfaz o último ponto colocado.
+  // Fase de captura + stopImmediatePropagation: o Esc global do App (desfazer ação) não dispara junto.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const draw = (mapRef.current as any)?.pm?.Draw;
+      const shape = draw?.getActiveShape?.();
+      if (shape !== 'Polygon' && shape !== 'Line') return;
+      const d = draw[shape];
+      const placed: number = d?._markers?.length ?? 0;
+      if (placed < 1) return; // nada em andamento: deixa o Esc seguir para o App
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      try {
+        if (placed > 1) {
+          d._removeLastVertex();
+        } else {
+          // só o 1º ponto: cancela o desenho e já deixa a ferramenta pronta para recomeçar
+          const opts = d.options;
+          d.disable();
+          d.enable(opts);
+        }
+      } catch {
+        // noop
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+
   // Esc fecha a guia de impressão enquanto ela estiver visível
   const frameOverlayActive = project.printConfig.showFrameOverlay;
   useEffect(() => {

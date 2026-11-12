@@ -257,14 +257,21 @@ export function App() {
     [mutateActiveProject]
   );
 
+  // Edições seguidas do mesmo elemento (arrastar um controle deslizante, digitar um nome)
+  // valem um único passo de Desfazer; senão cada pixel do controle viraria um passo.
+  const lastFeatureEditRef = useRef<{ id: string; at: number } | null>(null);
   const handleUpdateFeature = useCallback(
     (id: string, updater: (prev: CadastralFeature) => CadastralFeature) => {
+      const now = Date.now();
+      const last = lastFeatureEditRef.current;
+      const continuing = !!last && last.id === id && now - last.at < 800;
+      lastFeatureEditRef.current = { id, at: now };
       mutateActiveProject(
         (prev) => ({
           ...prev,
           features: prev.features.map((f) => (f.id === id ? updater(f) : f)),
         }),
-        true
+        !continuing
       );
     },
     [mutateActiveProject]
@@ -312,13 +319,34 @@ export function App() {
         return;
       }
       if (e.key === 'Escape') {
-        setActiveTool('select');
+        // Janelas e a guia de impressão têm o próprio Esc: não desfaz nada por trás delas
+        if (myMapsOpen || printModalOpen || labelDialog || activeProject.printConfig.showFrameOverlay) {
+          return;
+        }
+        // (O Esc durante o desenho de um polígono/linha remove o último ponto: ver o Canvas.)
+        if (canUndo) {
+          handleUndo();
+          showToast('Última ação desfeita (Esc). Ctrl+Y refaz.');
+        } else {
+          setActiveTool('select');
+        }
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleUndo, handleRedo, handleDeleteFeature, selectedFeatureId]);
+  }, [
+    handleUndo,
+    handleRedo,
+    handleDeleteFeature,
+    selectedFeatureId,
+    canUndo,
+    showToast,
+    myMapsOpen,
+    printModalOpen,
+    labelDialog,
+    activeProject.printConfig.showFrameOverlay,
+  ]);
 
   const handleViewportChange = useCallback(
     (center: LatLngTuple, zoom: number) => {
